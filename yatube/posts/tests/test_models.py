@@ -24,7 +24,7 @@ class PostModelTest(TestCase):
     def test_models_have_correct_object_names(self):
         """Проверяем, что у моделей корректно работает __str__."""
         # Напишите проверку тут
-        error_name = f"Вывод не имеет 15 символов"
+        error_name = "Вывод не имеет 15 символов"
         self.assertEqual(
             self.post.__str__(),
             self.post.text[:15],
