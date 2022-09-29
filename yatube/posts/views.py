@@ -1,31 +1,24 @@
-from django.core.paginator import Paginator
-from django.shortcuts import render, get_object_or_404, redirect
-from .models import Post, Group
-from django.contrib.auth import get_user_model
-from .forms import PostForm
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
+from django.shortcuts import get_object_or_404, redirect, render
 
+from .forms import PostForm
+from .models import Group, Post
 
 User = get_user_model()
 
 
-# выведем paginator в отдельную функцию во избежании повтора кода
-def pagination(request, objects):
-    paginator = Paginator(objects, settings.PAGINATOR_DEFAULT_SIZE)
-    # Из URL извлекаем номер запрошенной страницы - это значение параметра page
-    page_number = request.GET.get("page")
-    page_obj = paginator.get_page(page_number)
-    return page_obj
-
-
 def index(request):
+
     # Одна строка вместо тысячи слов на SQL:
     # в переменную posts будет сохранена выборка из 10 объектов модели Post,
     # отсортированных по полю pub_date по убыванию (от больших зн. к меньшим)
-    posts = Post.objects.all()
-    # Получаем набор записей для страницы с запрошенным номером
-    page_obj = pagination(request, posts)
+    paginator = Paginator(Post.objects.all(), settings.PAGINATOR_DEFAULT_SIZE)
+    page_number = request.GET.get("page")
+    # Получаем набор записей для страницы с запрошенным номеро
+    page_obj = paginator.get_page(page_number)
     # Отдаем в словаре контекста
     context = {
         "page_obj": page_obj,
@@ -41,9 +34,9 @@ def group_posts(request, slug):
     # В нашем случае в переменную group будут переданы объекты модели Group,
     # поле slug у которых соответствует значению slug в запросе
     group = get_object_or_404(Group, slug=slug)
-    posts = group.posts.all()
     # Получаем набор записей для страницы с запрошенным номером
-    page_obj = pagination(request, posts)
+    paginator = Paginator(group.posts.all(), settings.PAGINATOR_DEFAULT_SIZE)
+    page_obj = paginator.get_page(request.GET.get("page"))
     context = {
         "group": group,
         "page_obj": page_obj,
@@ -55,10 +48,10 @@ def group_posts(request, slug):
 def profile(request, username):
     # Здесь код запроса к модели и создание словаря контекста
     author = get_object_or_404(User, username=username)
-    posts = author.posts.all()
     count = author.posts.count()
+    paginator = Paginator(author.posts.all(), settings.PAGINATOR_DEFAULT_SIZE)
     # будем выгружать по 10 постов
-    page_obj = pagination(request, posts)
+    page_obj = paginator.get_page(request.GET.get("page"))
     context = {
         "page_obj": page_obj,
         "count": count,
@@ -94,7 +87,6 @@ def create_post(request):
         post.save()
         return redirect(f"/profile/{post.author}/", {"form": form})
 
-    form = PostForm()
     groups = Group.objects.all()
     context = {"form": form, "groups": groups}
     return render(request, "posts/create_post.html", context)
@@ -103,20 +95,21 @@ def create_post(request):
 # Редактировать пост, ф-я доступна только авторизованным пользователям
 @login_required
 def post_edit(request, post_id):
-    is_edit = True
-    post = get_object_or_404(Post, pk=post_id)
-    author = post.author
+    post = get_object_or_404(Post, id=post_id)
     groups = Group.objects.all()
-    form = PostForm(request.POST or None, instance=post)
-    if request.user == author:
-        if request.method == "POST" and form.is_valid:
-            post = form.save()
-            return redirect("posts:post_detail", post_id)
-        context = {
-            "form": form,
-            "is_edit": is_edit,
-            "post": post,
-            "groups": groups,
-        }
-        return render(request, "posts/create_post.html", context)
-    return redirect("posts:post_detail", post_id)
+    if request.user != post.author:
+        return redirect("posts:post_detail", post_id)
+    form = PostForm(
+        request.POST or None, files=request.FILES or None, instance=post
+    )
+    if form.is_valid():
+        form.save()
+        return redirect("posts:post_detail", post_id)
+    context = {
+        "form": form,
+        "is_edit": True,
+        "post": post,
+        "is_edit": True,
+        "groups": groups,
+    }
+    return render(request, "posts/create_post.html", context)

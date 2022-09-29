@@ -1,9 +1,8 @@
+from django import forms
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 from django.urls import reverse
-from django import forms
-
-from posts.models import Post, Group
+from posts.models import Group, Post
 
 User = get_user_model()
 
@@ -18,17 +17,21 @@ class PostsPagesTests(TestCase):
         )
 
         cls.group = Group.objects.create(
-            title="группа0",
-            slug="test_slug0",
-            description="проверка описания0",
+            title="Тестовая группа",
+            slug="test_slug",
+            description="Проверка описания",
         )
 
+        bilk_post: list = []
         for i in range(13):
-            cls.post = Post.objects.create(
-                text="Тестовый текст0",
-                author=cls.user,
-                group=Group.objects.get(slug="test_slug0"),
+            bilk_post.append(
+                Post(
+                    text=f"Тестовый текст",
+                    group=cls.group,
+                    author=cls.user,
+                )
             )
+        Post.objects.bulk_create(bilk_post)
 
         post_args = 1
         cls.index_url = ("posts:index", "posts/index.html", None)
@@ -108,12 +111,12 @@ class PostsPagesTests(TestCase):
             with self.subTest(template=template):
                 response = self.guest_client.get(template)
                 first_object = response.context["page_obj"][0]
-                task_author_0 = first_object.author.username
-                task_text_0 = first_object.text
-                task_group_0 = first_object.group.title
-                self.assertEqual(task_author_0, "Test_User")
-                self.assertEqual(task_text_0, "Тестовый текст0")
-                self.assertEqual(task_group_0, "группа0")
+                task_author = first_object.author.username
+                task_text = first_object.text
+                task_group = first_object.group.title
+                self.assertEqual(task_author, "Test_User")
+                self.assertEqual(task_text, "Тестовый текст")
+                self.assertEqual(task_group, "Тестовая группа")
 
     def test_post_detail_page_show_correct_context(self):
         """Шаблон post_detail сформирован с правильным контекстом."""

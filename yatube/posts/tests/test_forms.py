@@ -1,8 +1,9 @@
+from http import HTTPStatus
+
 from django.contrib.auth import get_user_model
-from django.test import TestCase, Client
+from django.test import Client, TestCase
 from django.urls import reverse
 from posts.models import Group, Post
-from posts.forms import PostForm
 
 User = get_user_model()
 
@@ -13,19 +14,21 @@ class PostFormTests(TestCase):
         super().setUpClass()
         cls.author = User.objects.create_user(username="Test_User")
         cls.group = Group.objects.create(
-            title="группа0",
-            slug="test_slug0",
-            description="проверка описания0",
+            title="Тестовая группа",
+            slug="test_slug",
+            description="Тестовое описание группы",
         )
 
         cls.post = Post.objects.create(
-            text="Тестовый заголовок",
+            text="Тестовый текст поста",
             author=cls.author,
+            group=cls.group,
         )
-        cls.guest_client = Client()
-        cls.authorized_client = Client()
-        cls.authorized_client.force_login(cls.author)
-        cls.form = PostForm()
+
+    def setUp(self):
+        self.guest_client = Client()
+        self.authorized_client = Client()
+        self.authorized_client.force_login(self.author)
 
     def test_create_post(self):
         posts_count = Post.objects.count()
@@ -38,29 +41,32 @@ class PostFormTests(TestCase):
         )
         self.assertEqual(Post.objects.count(), posts_count + 1)
         self.assertTrue(Post.objects.filter(text="Тестовый текст").exists())
+        post = Post.objects.latest("id")
+        self.assertEqual(post.text, form_data["text"])
+        self.assertEqual(post.author, self.author)
+        self.assertEqual(post.group_id, form_data["group"])
 
     def test_edit_post(self):
-        old_post = self.post
+        """Проверка редактирования записи авторизированным клиентом."""
+        post = Post.objects.create(
+            text="Текст поста для редактирования",
+            author=self.author,
+            group=self.group,
+        )
         form_data = {
-            "text": "Новый тестовый текст",
+            "text": "Отредактированный текст поста",
+            "group": self.group.id,
         }
-        self.authorized_client.post(
-            reverse("posts:post_edit", kwargs={"post_id": "1"}),
+        response = self.authorized_client.post(
+            reverse("posts:post_edit", args=[post.id]),
             data=form_data,
             follow=True,
         )
-        new_post = Post.objects.get(id=1)
-        self.assertNotEqual(old_post.text, new_post.text)
-
-    def test_unauth_user_cant_publish_post(self):
-        posts_count = Post.objects.count()
-        form_data = {
-            "text": "Тестовый текст",
-            "group": self.group.pk,
-        }
-        self.guest_client.post(
-            reverse("posts:create_post"), data=form_data, follow=True
+        self.assertRedirects(
+            response, reverse("posts:post_detail", kwargs={"post_id": post.id})
         )
-        self.assertEqual(Post.objects.count(), posts_count)
-        response = self.guest_client.get("/create/")
-        self.assertRedirects(response, "/auth/login/?next=/create/")
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        post = Post.objects.latest("id")
+        self.assertTrue(post.text == form_data["text"])
+        self.assertTrue(post.author == self.author)
+        self.assertTrue(post.group_id == form_data["group"])
