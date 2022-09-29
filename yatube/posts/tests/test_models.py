@@ -49,7 +49,6 @@ class PostModelTest(TestCase):
 
     # Проверка заполнения help_text в модели Post
     def test_help_text(self):
-        post = PostModelTest.post
         field_help_texts = {
             "text": "Введите текст поста",
             "group": "Группа, к которой будет относиться пост",

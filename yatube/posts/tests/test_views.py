@@ -26,7 +26,7 @@ class PostsPagesTests(TestCase):
         for i in range(13):
             bilk_post.append(
                 Post(
-                    text=f"Тестовый текст",
+                    text="Тестовый текст",
                     group=cls.group,
                     author=cls.user,
                 )
