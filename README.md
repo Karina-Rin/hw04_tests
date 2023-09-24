@@ -53,5 +53,5 @@ $ pytest
 * Python 3.7.1
 * Pytest 6.2.5
 * Flake8 4.0.1
-* Django 2.2.6
+* Django 2.2.8
 * Django-debug-toolbar 2.2
